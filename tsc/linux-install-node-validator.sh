@@ -4,6 +4,29 @@
 # so the mnemonic is not visible while typing. Run from a file in a real terminal (not curl | sh).
 set -e
 
+# Hide TTY echo while running a command that reads a mnemonic (stty, not read -s:
+# the child is tsc/tscd, not our read). Restores echo even if the command fails.
+run_hidden() {
+  old_stty=""
+  if [ -t 0 ]; then
+    old_stty=$(stty -g)
+    stty -echo
+    trap 'stty "$old_stty"; exit 130' INT TERM
+  fi
+  set +e
+  set +x
+  "$@"
+  hidden_rc=$?
+  if [ -n "$old_stty" ]; then
+    stty "$old_stty"
+    trap - INT TERM
+  fi
+  set -e
+  if [ "$hidden_rc" != 0 ]; then
+    return "$hidden_rc"
+  fi
+}
+
 # --- Parse arguments ---
 USERNAME=""
 LICENSE_KEY=""
@@ -239,7 +262,9 @@ fi
 $node workloads add tsc.chain.validator
 
 # --- Install validator node ---
-$node validator install -e "$ENVIRONMENT"
+# tsc validator install may run `tscd init --recover` and echo the mnemonic; hide it.
+echo "If asked for a bip39 mnemonic here, typing is hidden."
+run_hidden $node validator install -e "$ENVIRONMENT" || exit $?
 
 # --- Pause before configure ---
 echo ""
@@ -302,24 +327,7 @@ echo "Recovering operator key into keyring..."
 echo "You will be prompted for your mnemonic and a keyring passphrase."
 echo "Characters are hidden while you type."
 echo ""
-old_stty=""
-if [ -t 0 ]; then
-  old_stty=$(stty -g)
-  stty -echo
-  trap 'stty "$old_stty"; exit 130' INT TERM
-fi
-set +e
-set +x
-${tscd} keys add operator --recover --keyring-backend file
-add_rc=$?
-set -e
-if [ -n "$old_stty" ]; then
-  stty "$old_stty"
-  trap - INT TERM
-fi
-if [ "$add_rc" != 0 ]; then
-  exit "$add_rc"
-fi
+run_hidden ${tscd} keys add operator --recover --keyring-backend file || exit $?
 
 # --- Submit create-validator transaction ---
 echo ""
