@@ -28,7 +28,7 @@ HOME_FLAG="${TSC_HOME:+--home $TSC_HOME}"
 KEY_NAME="${KEY_NAME:-operator}"
 VALIDATOR_JSON="${VALIDATOR_JSON:-/root/validator.json}"
 CHAIN_ID="${CHAIN_ID:-tsc_87878-1}"
-FEES="${FEES:-1000000000aTSC}"
+GAS_PRICES="${GAS_PRICES:-1000000000aTSC}"
 
 if [ "$(id -u)" != "0" ]; then
   echo "Error: run as root."
@@ -56,7 +56,7 @@ echo ""
 run_hidden "$TSCD" tx staking create-validator "$VALIDATOR_JSON" \
   --from "$KEY_NAME" --keyring-backend file \
   --chain-id "$CHAIN_ID" \
-  --fees "$FEES" --gas auto --gas-adjustment 1.5 -y \
+  --gas auto --gas-adjustment 1.5 --gas-prices "$GAS_PRICES" -y \
   $HOME_FLAG || exit $?
 
 echo ""
